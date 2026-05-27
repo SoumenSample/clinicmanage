@@ -18,6 +18,10 @@ const registerSchema = z.object({
   billingEmail: z.string().email().optional(),
 });
 
+function isMongoUnavailableError(error: unknown) {
+  return error instanceof Error && error.message.startsWith('Unable to connect to MongoDB.');
+}
+
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
@@ -89,6 +93,13 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error: any) {
+    if (isMongoUnavailableError(error)) {
+      return NextResponse.json(
+        { error: 'Registration service is unavailable right now. Start MongoDB or update MONGODB_URI.' },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       { error: error.message || 'Registration failed' },
       { status: 500 }

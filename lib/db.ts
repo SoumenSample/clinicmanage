@@ -2,6 +2,21 @@ import mongoose from 'mongoose';
 
 const MONGODB_URI = process.env.MONGODB_URI;
 
+function buildLocalFallbackUri(uri: string) {
+  try {
+    const parsed = new URL(uri);
+    const databaseName = parsed.pathname.replace(/^\//, '') || 'clinic_management';
+
+    return `mongodb://127.0.0.1:27017/${databaseName}`;
+  } catch {
+    return 'mongodb://127.0.0.1:27017/clinic_management';
+  }
+}
+
+function isDevMongoFallbackEnabled() {
+  return process.env.NODE_ENV !== 'production';
+}
+
 type MongooseCache = {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
@@ -32,6 +47,7 @@ async function connectDB() {
   if (!activeCache.promise) {
     const opts = {
       bufferCommands: false,
+      serverSelectionTimeoutMS: 3000,
     };
 
     activeCache.promise = mongoose
@@ -45,7 +61,30 @@ async function connectDB() {
     activeCache.conn = await activeCache.promise;
   } catch (e) {
     activeCache.promise = null;
-    throw e;
+
+    if (!isDevMongoFallbackEnabled()) {
+      throw e;
+    }
+
+    const fallbackUri = buildLocalFallbackUri(MONGODB_URI!);
+
+    try {
+      await mongoose.disconnect();
+      activeCache.promise = mongoose.connect(fallbackUri, {
+        bufferCommands: false,
+        serverSelectionTimeoutMS: 3000,
+      });
+      activeCache.conn = await activeCache.promise;
+    } catch (fallbackError) {
+      activeCache.promise = null;
+
+      const mainMessage = e instanceof Error ? e.message : 'Unknown MongoDB connection error';
+      const fallbackMessage = fallbackError instanceof Error ? fallbackError.message : 'Unknown local MongoDB connection error';
+
+      throw new Error(
+        `Unable to connect to MongoDB. Primary URI failed with: ${mainMessage}. Local fallback failed with: ${fallbackMessage}.`
+      );
+    }
   }
 
   cached = activeCache;
