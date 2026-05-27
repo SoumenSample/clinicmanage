@@ -34,7 +34,7 @@ export default function RootLayout({
         <AppShell>
           <ToastProvider>
             <Navbar />
-            <main className="flex-1">
+            <main className="flex-1 lg:pl-72">
               <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">{children}</div>
             </main>
           </ToastProvider>
