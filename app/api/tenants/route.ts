@@ -22,8 +22,7 @@ export const GET = withSuperAdminAuth(async () => {
     await connectDB();
 
     const tenants = await Tenant.find({})
-      .sort({ createdAt: -1 })
-      .lean();
+      .sort({ createdAt: -1 });
 
     const tenantIds = tenants.map((tenant) => tenant._id);
     const managers = await User.find(

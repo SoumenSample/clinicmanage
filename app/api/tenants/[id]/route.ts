@@ -188,12 +188,16 @@ export const DELETE = withSuperAdminAuth(
       const connection = await connectDB();
       const { id } = await params;
 
-      const tenant = await Tenant.findById(id).lean();
+      const tenant = await Tenant.findById(id);
       if (!tenant) {
         return NextResponse.json({ error: 'Business not found' }, { status: 404 });
       }
 
       const db = connection.connection.db;
+      if (!db) {
+        throw new Error('Database connection unavailable');
+      }
+
       const collections = await db.listCollections().toArray();
 
       for (const collection of collections) {
