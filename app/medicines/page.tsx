@@ -335,7 +335,7 @@ export default function MedicinesPage() {
                 Categories
               </Link>
 
-              {user?.role === 'admin' && (
+              {(user?.role === 'admin' || user?.role === 'owner' || user?.role === 'super_admin') && (
                 <button
                   onClick={() => {
                     if (showForm) {

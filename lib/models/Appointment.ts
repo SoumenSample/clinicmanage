@@ -73,4 +73,13 @@ AppointmentSchema.index({ tenantId: 1, patientId: 1, dateTime: 1 });
 AppointmentSchema.index({ tenantId: 1, doctorProfileId: 1, dateTime: 1 });
 AppointmentSchema.index({ tenantId: 1, patientProfileId: 1, dateTime: 1 });
 
+AppointmentSchema.index(
+  { tenantId: 1, doctorId: 1, dateTime: 1 },
+  { unique: true, partialFilterExpression: { doctorId: { $exists: true } } }
+);
+AppointmentSchema.index(
+  { tenantId: 1, doctorProfileId: 1, dateTime: 1 },
+  { unique: true, partialFilterExpression: { doctorProfileId: { $exists: true } } }
+);
+
 export default mongoose.models.Appointment || mongoose.model<IAppointment>('Appointment', AppointmentSchema);

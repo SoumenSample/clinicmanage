@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import jwt from 'jsonwebtoken';
+import connectDB from '@/lib/db';
+import Tenant from '@/lib/models/Tenant';
 import { getOrCreateDefaultTenant } from '@/lib/services/tenant';
 import type { ClinicRole } from '@/lib/roles';
 
@@ -37,7 +39,26 @@ export function getTokenFromRequest(request: NextRequest): string | null {
   return parts[1];
 }
 
-async function buildAuthContext(decoded: DecodedToken): Promise<AuthContext> {
+export async function buildAuthContext(decoded: DecodedToken, request?: NextRequest): Promise<AuthContext> {
+  if (decoded.role === 'super_admin') {
+    const activeTenantId =
+      request?.cookies.get('activeTenantId')?.value || request?.headers.get('x-tenant-id');
+
+    if (activeTenantId) {
+      await connectDB();
+      const selectedTenant = await Tenant.findById(activeTenantId)
+        .select('slug')
+        .lean<{ _id: string; slug: string }>();
+      if (selectedTenant && !Array.isArray(selectedTenant)) {
+        return {
+          ...decoded,
+          tenantId: String(selectedTenant._id),
+          tenantSlug: selectedTenant.slug,
+        };
+      }
+    }
+  }
+
   if (decoded.tenantId && decoded.tenantSlug) {
     return {
       ...decoded,
@@ -55,7 +76,7 @@ async function buildAuthContext(decoded: DecodedToken): Promise<AuthContext> {
 }
 
 export function withAuth(handler: Function) {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, ...args: any[]) => {
     try {
       const token = getTokenFromRequest(request);
 
@@ -75,10 +96,10 @@ export function withAuth(handler: Function) {
         );
       }
 
-      const authContext = await buildAuthContext(decoded);
+      const authContext = await buildAuthContext(decoded, request);
       (request as any).user = authContext;
       (request as any).auth = authContext;
-      return handler(request);
+      return handler(request, ...args);
     } catch (error: any) {
       console.error('Auth middleware error:', error);
       return NextResponse.json(
@@ -90,7 +111,7 @@ export function withAuth(handler: Function) {
 }
 
 export function withAdminAuth(handler: Function) {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, ...args: any[]) => {
     try {
       const token = getTokenFromRequest(request);
 
@@ -110,9 +131,9 @@ export function withAdminAuth(handler: Function) {
         );
       }
 
-      const authContext = await buildAuthContext(decoded);
+      const authContext = await buildAuthContext(decoded, request);
 
-      if (authContext.role !== 'admin' && authContext.role !== 'owner') {
+      if (authContext.role !== 'admin' && authContext.role !== 'owner' && authContext.role !== 'super_admin') {
         return NextResponse.json(
           { error: 'Admin access required' },
           { status: 403 }
@@ -121,7 +142,49 @@ export function withAdminAuth(handler: Function) {
 
       (request as any).user = authContext;
       (request as any).auth = authContext;
-      return handler(request);
+      return handler(request, ...args);
+    } catch (error) {
+      return NextResponse.json(
+        { error: 'Authorization error' },
+        { status: 500 }
+      );
+    }
+  };
+}
+
+export function withSuperAdminAuth(handler: Function) {
+  return async (request: NextRequest, ...args: any[]) => {
+    try {
+      const token = getTokenFromRequest(request);
+
+      if (!token) {
+        return NextResponse.json(
+          { error: 'No authorization token' },
+          { status: 401 }
+        );
+      }
+
+      const decoded = verifyToken(token);
+
+      if (!decoded) {
+        return NextResponse.json(
+          { error: 'Invalid or expired token' },
+          { status: 401 }
+        );
+      }
+
+      const authContext = await buildAuthContext(decoded, request);
+
+      if (authContext.role !== 'super_admin') {
+        return NextResponse.json(
+          { error: 'Super admin access required' },
+          { status: 403 }
+        );
+      }
+
+      (request as any).user = authContext;
+      (request as any).auth = authContext;
+      return handler(request, ...args);
     } catch (error) {
       return NextResponse.json(
         { error: 'Authorization error' },
@@ -132,7 +195,7 @@ export function withAdminAuth(handler: Function) {
 }
 
 export function withStaffAuth(handler: Function) {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, ...args: any[]) => {
     try {
       const token = getTokenFromRequest(request);
 
@@ -152,9 +215,9 @@ export function withStaffAuth(handler: Function) {
         );
       }
 
-      const authContext = await buildAuthContext(decoded);
+      const authContext = await buildAuthContext(decoded, request);
 
-      const allowedRoles = ['admin', 'owner', 'receptionist', 'cashier', 'inventory_manager', 'doctor'];
+      const allowedRoles = ['super_admin', 'admin', 'owner', 'receptionist', 'cashier', 'inventory_manager', 'doctor'];
       if (!allowedRoles.includes(authContext.role)) {
         return NextResponse.json(
           { error: 'Staff access required' },
@@ -164,7 +227,7 @@ export function withStaffAuth(handler: Function) {
 
       (request as any).user = authContext;
       (request as any).auth = authContext;
-      return handler(request);
+      return handler(request, ...args);
     } catch (error) {
       return NextResponse.json(
         { error: 'Authorization error' },

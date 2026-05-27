@@ -3,6 +3,7 @@ import connectDB from '@/lib/db';
 import Appointment from '@/lib/models/Appointment';
 import User from '@/lib/models/User';
 import { isAppointmentWithinAvailability } from '@/lib/services/clinic';
+import { createSystemAlert } from '@/lib/services/alerts';
 import { withAuth } from '@/middleware/auth';
 import { z } from 'zod';
 
@@ -270,6 +271,21 @@ export async function POST(request: NextRequest) {
       // appointment data prepared for save
 
       await appointment.save();
+      // publish alert for new appointment
+      try {
+        const patientName = (appointment as any).patientId ? undefined : undefined; // optional: could populate names
+        await createSystemAlert({
+          tenantId: auth?.tenantId,
+          title: `Appointment booked`,
+          message: `An appointment was booked for ${appointment.dateTime.toISOString()}.`,
+          category: 'appointments',
+          severity: 'info',
+          entityType: 'Appointment',
+          entityId: appointment._id.toString(),
+        });
+      } catch {
+        // ignore alert failures
+      }
       await appointment.populate('doctorId', 'name email');
       await appointment.populate('doctorProfileId', 'name email');
       await appointment.populate('patientId', 'name email');
@@ -318,6 +334,12 @@ export async function POST(request: NextRequest) {
         { status: 201 }
       );
     } catch (error: any) {
+      if (error?.code === 11000) {
+        return NextResponse.json(
+          { error: 'This time slot has already been booked.' },
+          { status: 409 }
+        );
+      }
       if (error.name === 'ZodError') {
         return NextResponse.json(
           { error: error.errors[0]?.message || 'Validation failed' },

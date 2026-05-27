@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { getDashboardPath, isPublicAuthPath, isRouteAllowedForRole } from '@/lib/roles';
+import ToastProvider from './ToastProvider';
 
 function getStoredRole(): string | null {
   if (typeof window === 'undefined') {

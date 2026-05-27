@@ -28,12 +28,19 @@ export async function POST(request: NextRequest) {
     const token = getTokenFromRequest(request);
     const decoded = token ? verifyToken(token) : null;
     const actorRole = decoded ? normalizeDashboardRole(decoded.role) : null;
-    const isPrivilegedCreator = actorRole === 'owner' || actorRole === 'admin';
+    const isPrivilegedCreator = actorRole === 'owner' || actorRole === 'admin' || actorRole === 'super_admin';
     const effectiveRole = role ?? 'patient';
 
     if (!isPrivilegedCreator && effectiveRole !== 'patient') {
       return NextResponse.json(
         { error: 'Public registration can only create patient accounts' },
+        { status: 403 }
+      );
+    }
+
+    if (effectiveRole === 'super_admin' && actorRole !== 'super_admin') {
+      return NextResponse.json(
+        { error: 'Super admin accounts can only be created by a super admin' },
         { status: 403 }
       );
     }

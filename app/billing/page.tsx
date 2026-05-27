@@ -125,6 +125,23 @@ export default function BillingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState<'new' | 'history'>('new');
+  const [billingSummary, setBillingSummary] = useState<{
+    totals: { totalRevenue: number; invoiceCount: number };
+    stores: Array<{ tenantId: string; tenantName: string; tenantSlug: string; totalRevenue: number; invoiceCount: number }>;
+  } | null>(null);
+  const [summaryLoading, setSummaryLoading] = useState(false);
+
+  const isSuperAdmin = useMemo(() => {
+    if (typeof window === 'undefined') return false;
+    const rawUser = window.localStorage.getItem('user');
+    if (!rawUser) return false;
+    try {
+      const parsed = JSON.parse(rawUser) as { role?: string } | null;
+      return parsed?.role === 'super_admin';
+    } catch {
+      return false;
+    }
+  }, []);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
@@ -135,7 +152,10 @@ export default function BillingPage() {
     }
 
     fetchData();
-  }, [router]);
+    if (isSuperAdmin) {
+      fetchBillingSummary();
+    }
+  }, [isSuperAdmin, router]);
 
   const fetchData = async () => {
     try {
@@ -202,6 +222,27 @@ export default function BillingPage() {
       setError(err.message);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const fetchBillingSummary = async () => {
+    try {
+      setSummaryLoading(true);
+      const token = localStorage.getItem('token');
+      const response = await fetch('/api/billing/summary', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to load billing summary');
+      }
+
+      setBillingSummary(data);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load billing summary');
+    } finally {
+      setSummaryLoading(false);
     }
   };
 
@@ -742,6 +783,64 @@ export default function BillingPage() {
             <p className="text-sm">{error}</p>
           </div>
         </div>
+      )}
+
+      {isSuperAdmin && (
+        <section className="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-slate-950">All stores revenue</h2>
+              <p className="mt-1 text-sm text-slate-500">
+                Track billing performance across every business and switch to a specific store when needed.
+              </p>
+            </div>
+            {summaryLoading && (
+              <div className="inline-flex items-center gap-2 text-sm text-slate-500">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Loading summary...
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Total revenue</p>
+              <p className="mt-2 text-2xl font-bold text-slate-950">
+                ₹{Number(billingSummary?.totals.totalRevenue || 0).toFixed(2)}
+              </p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">Invoices</p>
+              <p className="mt-2 text-2xl font-bold text-slate-950">
+                {billingSummary?.totals.invoiceCount ?? 0}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-6 overflow-hidden rounded-2xl border border-slate-200">
+            <div className="grid grid-cols-3 gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              <span>Store</span>
+              <span>Revenue</span>
+              <span>Invoices</span>
+            </div>
+            <div className="divide-y divide-slate-200">
+              {(billingSummary?.stores || []).map((store) => (
+                <div key={store.tenantId} className="grid grid-cols-3 gap-3 px-4 py-3 text-sm text-slate-700">
+                  <div>
+                    <p className="font-semibold text-slate-900">{store.tenantName}</p>
+                    <p className="text-xs text-slate-500">{store.tenantSlug}</p>
+                  </div>
+                  <span className="font-semibold text-slate-900">₹{Number(store.totalRevenue || 0).toFixed(2)}</span>
+                  <span>{store.invoiceCount}</span>
+                </div>
+              ))}
+
+              {!summaryLoading && (billingSummary?.stores || []).length === 0 && (
+                <div className="px-4 py-6 text-sm text-slate-500">No sales recorded yet.</div>
+              )}
+            </div>
+          </div>
+        </section>
       )}
 
       {activeTab === 'new' && (

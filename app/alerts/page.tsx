@@ -4,10 +4,12 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
 interface Alert {
-  _id: string;
-  medicineName: string;
-  alertType: 'low_stock' | 'expiry_soon' | 'expired';
+  id: string;
+  kind: 'stock' | 'system';
+  title: string;
   message: string;
+  category: 'appointments' | 'billing' | 'doctors' | 'prescriptions' | 'patients' | 'inventory' | 'system';
+  severity: 'info' | 'warning' | 'critical';
   isResolved: boolean;
   createdAt: string;
 }
@@ -28,6 +30,30 @@ export default function AlertsPage() {
     }
 
     fetchAlerts();
+
+    const eventSource = new EventSource(`/api/alerts/stream?token=${encodeURIComponent(token)}`);
+    eventSource.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload?.type === 'alert' && payload.alert) {
+          setAlerts((prev) => {
+            if (prev.some((existing) => existing.id === payload.alert.id && existing.kind === payload.alert.kind)) {
+              return prev;
+            }
+            return [payload.alert, ...prev];
+          });
+        }
+      } catch {
+        // Ignore SSE parse errors.
+      }
+    };
+    eventSource.onerror = () => {
+      eventSource.close();
+    };
+
+    return () => {
+      eventSource.close();
+    };
   }, [router]);
 
   useEffect(() => {
@@ -56,10 +82,10 @@ export default function AlertsPage() {
     }
   };
 
-  const handleResolveAlert = async (alertId: string) => {
+  const handleResolveAlert = async (alertId: string, kind: Alert['kind']) => {
     try {
       const token = localStorage.getItem('token');
-      const response = await fetch(`/api/alerts?id=${alertId}`, {
+      const response = await fetch(`/api/alerts?id=${alertId}&kind=${kind}`, {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -72,27 +98,32 @@ export default function AlertsPage() {
     }
   };
 
-  const getAlertTone = (alertType: string) => {
-    switch (alertType) {
-      case 'expired':
+  const getAlertTone = (severity: Alert['severity']) => {
+    switch (severity) {
+      case 'critical':
         return 'border-red-200 bg-red-50 text-red-800';
-      case 'expiry_soon':
-        return 'border-yellow-200 bg-yellow-50 text-yellow-800';
-      case 'low_stock':
-        return 'border-orange-200 bg-orange-50 text-orange-800';
+      case 'warning':
+        return 'border-amber-200 bg-amber-50 text-amber-800';
       default:
         return 'border-slate-200 bg-slate-50 text-slate-800';
     }
   };
 
-  const getAlertLabel = (alertType: string) => {
-    switch (alertType) {
-      case 'expired':
-        return 'Expired';
-      case 'expiry_soon':
-        return 'Expiry Soon';
-      case 'low_stock':
-        return 'Low Stock';
+  const getAlertLabel = (alert: Alert) => {
+    if (alert.kind === 'stock') return 'Inventory';
+    switch (alert.category) {
+      case 'appointments':
+        return 'Appointment';
+      case 'billing':
+        return 'Billing';
+      case 'doctors':
+        return 'Doctor';
+      case 'prescriptions':
+        return 'Prescription';
+      case 'patients':
+        return 'Patient';
+      case 'inventory':
+        return 'Inventory';
       default:
         return 'Alert';
     }
@@ -106,7 +137,7 @@ export default function AlertsPage() {
     <div className="space-y-6">
       <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h1 className="text-3xl font-semibold tracking-tight text-slate-900">Alerts Center</h1>
-        <p className="mt-2 text-sm text-slate-600">Review unresolved inventory issues and mark them as resolved when handled.</p>
+        <p className="mt-2 text-sm text-slate-600">Review operational alerts and notifications as they come in.</p>
       </section>
 
       {error && <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-700">{error}</div>}
@@ -141,20 +172,20 @@ export default function AlertsPage() {
       ) : (
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           {filteredAlerts.map((alert) => (
-            <div key={alert._id} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <div key={`${alert.kind}-${alert.id}`} className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getAlertTone(alert.alertType)}`}>
-                    {getAlertLabel(alert.alertType)}
+                  <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getAlertTone(alert.severity)}`}>
+                    {getAlertLabel(alert)}
                   </span>
-                  <h3 className="mt-3 text-lg font-semibold text-slate-900">{alert.medicineName}</h3>
+                  <h3 className="mt-3 text-lg font-semibold text-slate-900">{alert.title}</h3>
                   <p className="mt-1 text-sm text-slate-700">{alert.message}</p>
                   <p className="mt-3 text-xs text-slate-500">{new Date(alert.createdAt).toLocaleString()}</p>
                 </div>
 
                 {!alert.isResolved ? (
                   <button
-                    onClick={() => handleResolveAlert(alert._id)}
+                    onClick={() => handleResolveAlert(alert.id, alert.kind)}
                     className="rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white hover:bg-green-700"
                   >
                     Mark Resolved

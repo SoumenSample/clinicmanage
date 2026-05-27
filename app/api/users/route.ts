@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
 
       // If roleFilter is present allow staff roles to query doctors/patients/etc.
       // Patients can also query doctors for appointment booking.
-      const staffAllowed = ['owner', 'admin', 'receptionist', 'cashier', 'inventory_manager', 'doctor'];
+      const staffAllowed = ['super_admin', 'owner', 'admin', 'receptionist', 'cashier', 'inventory_manager', 'doctor'];
 
       if (roleFilter) {
         const canAccessRoleFilter =
@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
           return NextResponse.json({ error: 'Staff access required' }, { status: 403 });
         }
       } else {
-        if (auth.role !== 'admin' && auth.role !== 'owner') {
+        if (auth.role !== 'admin' && auth.role !== 'owner' && auth.role !== 'super_admin') {
           return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
         }
       }

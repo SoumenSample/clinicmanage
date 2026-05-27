@@ -8,6 +8,7 @@ import Sale from '@/lib/models/Sale';
 import Availability from '@/lib/models/Availability';
 import { calculateInclusiveTaxBreakdown } from '@/lib/utils/gst';
 import { writeAuditLog } from '@/lib/services/audit';
+import { createSystemAlert } from '@/lib/services/alerts';
 
 export interface DoctorPayload {
   name: string;
@@ -137,6 +138,20 @@ export async function createDoctor(tenantId: string, actorUserId: string, payloa
     entityId: doctor._id.toString(),
     after: doctor.toObject(),
   });
+  // Publish alert for new doctor
+  try {
+    await createSystemAlert({
+      tenantId,
+      title: `Doctor created: ${doctor.name}`,
+      message: `A new doctor (${doctor.name}) was added to the clinic.`,
+      category: 'doctors',
+      severity: 'info',
+      entityType: 'Doctor',
+      entityId: doctor._id.toString(),
+    });
+  } catch {
+    // non-fatal
+  }
   return doctor;
 }
 
@@ -199,6 +214,20 @@ export async function createPatient(tenantId: string, actorUserId: string, paylo
     entityId: patient._id.toString(),
     after: patient.toObject(),
   });
+  // Publish alert for new patient
+  try {
+    await createSystemAlert({
+      tenantId,
+      title: `Patient created: ${patient.name}`,
+      message: `A new patient (${patient.name}) was registered.`,
+      category: 'patients',
+      severity: 'info',
+      entityType: 'Patient',
+      entityId: patient._id.toString(),
+    });
+  } catch {
+    // non-fatal
+  }
   return patient;
 }
 
@@ -269,6 +298,21 @@ export async function createPrescription(tenantId: string, actorUserId: string, 
     entityId: prescription._id.toString(),
     after: prescription.toObject(),
   });
+
+  // Publish alert for new prescription
+  try {
+    await createSystemAlert({
+      tenantId,
+      title: `Prescription created`,
+      message: `A prescription was created for patient ${payload.patientId || 'N/A'}.`,
+      category: 'prescriptions',
+      severity: 'info',
+      entityType: 'Prescription',
+      entityId: prescription._id.toString(),
+    });
+  } catch {
+    // non-fatal
+  }
 
   return prescription;
 }
@@ -545,6 +589,21 @@ export async function createSale(
     entityId: sale._id.toString(),
     after: sale.toObject(),
   });
+
+  // Publish alert for new sale/billing
+  try {
+    await createSystemAlert({
+      tenantId,
+      title: `Billing created: ${sale.invoiceNumber || String(sale._id).slice(-6)}`,
+      message: `A sale was recorded (invoice ${sale.invoiceNumber || 'N/A'}) by ${actorUserId}.`,
+      category: 'billing',
+      severity: 'info',
+      entityType: 'Sale',
+      entityId: sale._id.toString(),
+    });
+  } catch {
+    // non-fatal
+  }
 
   return sale;
 }

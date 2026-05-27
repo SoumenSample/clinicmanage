@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
-import { useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import { getRoleNavigation, normalizeDashboardRole } from '@/lib/roles';
 
 type StoredUser = {
@@ -51,6 +51,53 @@ export default function Navbar() {
   const user = useSyncExternalStore(subscribeToStoredUser, getStoredUserSnapshot, () => null);
   const navItems = user ? getRoleNavigation(user.role) : [];
   const roleLabel = user ? normalizeDashboardRole(user.role) : null;
+  const [tenants, setTenants] = useState<Array<{ id: string; name: string }>>([]);
+  const [activeTenantId, setActiveTenantIdState] = useState('');
+  const isSuperAdmin = user?.role === 'super_admin';
+
+  const getActiveTenantId = () => {
+    if (typeof document === 'undefined') return '';
+    const match = document.cookie
+      .split(';')
+      .map((item) => item.trim())
+      .find((item) => item.startsWith('activeTenantId='));
+    return match ? decodeURIComponent(match.split('=')[1] || '') : '';
+  };
+
+  const setActiveTenantId = (value: string) => {
+    if (typeof document === 'undefined') return;
+    const encoded = encodeURIComponent(value);
+    document.cookie = `activeTenantId=${encoded}; path=/; samesite=lax`;
+  };
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const loadTenants = async () => {
+      try {
+        const response = await fetch('/api/tenants', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await response.json();
+        if (!response.ok) {
+          return;
+        }
+
+        const items = Array.isArray(data.tenants)
+          ? data.tenants.map((tenant: any) => ({ id: tenant.id, name: tenant.name }))
+          : [];
+        setTenants(items);
+        setActiveTenantIdState(getActiveTenantId());
+      } catch {
+        setTenants([]);
+      }
+    };
+
+    loadTenants();
+  }, [isSuperAdmin]);
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -95,7 +142,7 @@ export default function Navbar() {
                   </Link>
                 );
               })}
-              {(user.role === 'admin' || user.role === 'owner') && (
+              {(user.role === 'admin' || user.role === 'owner' || user.role === 'super_admin') && (
                 <Link
                   href="/users"
                   className={`rounded-lg px-3 py-2 text-sm font-medium whitespace-nowrap ${
@@ -110,6 +157,28 @@ export default function Navbar() {
             </div>
 
             <div className="flex items-center justify-between gap-3 lg:justify-end">
+              {isSuperAdmin && tenants.length > 0 && (
+                <label className="hidden items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 lg:flex">
+                  <span className="text-xs font-medium uppercase tracking-[0.2em] text-slate-400">Store</span>
+                  <select
+                    value={activeTenantId}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setActiveTenantId(value);
+                      setActiveTenantIdState(value);
+                      window.location.reload();
+                    }}
+                    className="bg-transparent text-sm font-medium text-slate-700 outline-none"
+                  >
+                    <option value="">Select store</option>
+                    {tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
               <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-sm text-slate-700 lg:block">
                 {user.name} <span className="text-slate-500">({roleLabel})</span>
               </div>

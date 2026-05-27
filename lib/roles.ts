@@ -1,4 +1,5 @@
 export const clinicRoles = [
+  'super_admin',
   'owner',
   'admin',
   'receptionist',
@@ -37,17 +38,42 @@ const publicAuthPaths = ['/login', '/register', '/register/verify'];
 
 const commonManagementNav: RoleNavItem[] = [
   { href: '/dashboard', label: 'Dashboard' },
-  { href: '/medicines', label: 'Medicines' },
-  { href: '/categories', label: 'Categories' },
-  { href: '/shelves', label: 'Shelves' },
+  { href: '/appointments', label: 'Appointments' },
+  // { href: '/medicines', label: 'Medicines' },
+  // { href: '/categories', label: 'Categories' },
+  // { href: '/shelves', label: 'Shelves' },
   { href: '/billing', label: 'Billing' },
   { href: '/dashboard/doctors', label: 'Doctors' },
-  { href: '/dashboard/suppliers', label: 'Suppliers' },
+  // { href: '/dashboard/suppliers', label: 'Suppliers' },
   { href: '/alerts', label: 'Alerts' },
   { href: '/settings', label: 'Settings' },
 ];
 
+const superAdminNav: RoleNavItem[] = [
+  ...commonManagementNav,
+  { href: '/settings/tenants', label: 'Businesses' },
+];
+
 export const roleDashboards: Record<DashboardRole, RoleDashboard> = {
+  super_admin: {
+    title: 'Super Admin Command Center',
+    subtitle: 'Multi-business oversight and governance',
+    summary:
+      'Create and manage businesses, oversee performance across stores, and switch contexts instantly for a complete view of operations.',
+    badge: 'Global access',
+    metrics: [
+      { label: 'Scope', value: 'All stores', note: 'Cross-tenant visibility and control' },
+      { label: 'Access', value: 'Full', note: 'Users, billing, inventory, and care' },
+      { label: 'Focus', value: 'Governance', note: 'Health, revenue, and compliance' },
+    ],
+    actions: [
+      { title: 'Manage businesses', description: 'Create new businesses and assign admins.', href: '/settings/tenants' },
+      { title: 'Review billing', description: 'Track collections and payment health by store.', href: '/billing' },
+      { title: 'Monitor inventory', description: 'Inspect stock and alerts across stores.', href: '/medicines' },
+      { title: 'Open doctor board', description: 'See schedules and appointment flow.', href: '/dashboard/doctors' },
+    ],
+    navigation: superAdminNav,
+  },
   owner: {
     title: 'Owner Control Center',
     subtitle: 'Full clinical and business oversight',
@@ -132,7 +158,7 @@ export const roleDashboards: Record<DashboardRole, RoleDashboard> = {
     navigation: [
       { href: '/dashboard', label: 'Dashboard' },
       { href: '/billing', label: 'Billing' },
-      { href: '/dashboard/suppliers', label: 'Suppliers' },
+      // { href: '/dashboard/suppliers', label: 'Suppliers' },
       { href: '/patients', label: 'Patients' },
       { href: '/alerts', label: 'Alerts' },
     ],
@@ -156,9 +182,9 @@ export const roleDashboards: Record<DashboardRole, RoleDashboard> = {
     ],
     navigation: [
       { href: '/dashboard', label: 'Dashboard' },
-      { href: '/medicines', label: 'Medicines' },
-      { href: '/categories', label: 'Categories' },
-      { href: '/shelves', label: 'Shelves' },
+      // { href: '/medicines', label: 'Medicines' },
+      // { href: '/categories', label: 'Categories' },
+      // { href: '/shelves', label: 'Shelves' },
       { href: '/alerts', label: 'Alerts' },
     ],
   },
@@ -214,6 +240,7 @@ export const roleDashboards: Record<DashboardRole, RoleDashboard> = {
 };
 
 const roleRoutePrefixes: Record<DashboardRole, string[]> = {
+  super_admin: [],
   owner: [],
   admin: [],
   receptionist: ['/patients', '/appointments', '/dashboard/doctors', '/alerts', '/settings'],
@@ -225,6 +252,7 @@ const roleRoutePrefixes: Record<DashboardRole, string[]> = {
 
 export function normalizeDashboardRole(role?: string | null): DashboardRole {
   if (
+    role === 'super_admin' ||
     role === 'owner' ||
     role === 'admin' ||
     role === 'receptionist' ||
@@ -270,7 +298,7 @@ export function isRouteAllowedForRole(pathname: string, role?: string | null): b
 
   const normalizedRole = normalizeDashboardRole(role);
 
-  if (normalizedRole === 'owner' || normalizedRole === 'admin') {
+  if (normalizedRole === 'super_admin' || normalizedRole === 'owner' || normalizedRole === 'admin') {
     return true;
   }
 
@@ -287,7 +315,7 @@ export function isRouteAllowedForRole(pathname: string, role?: string | null): b
 export function getAllowedRoutePrefixes(role?: string | null): string[] {
   const normalizedRole = normalizeDashboardRole(role);
 
-  if (normalizedRole === 'owner' || normalizedRole === 'admin') {
+  if (normalizedRole === 'super_admin' || normalizedRole === 'owner' || normalizedRole === 'admin') {
     return [];
   }
 

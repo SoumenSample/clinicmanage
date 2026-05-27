@@ -4,6 +4,8 @@ import Category from '@/lib/models/Category';
 import Medicine from '@/lib/models/Medicine';
 import Shelf from '@/lib/models/Shelf';
 import StockAlert from '@/lib/models/StockAlert';
+import { publishAlertEvent } from '@/lib/services/alertStream';
+import { mapStockAlertToPayload } from '@/lib/services/alerts';
 import { withAdminAuth, withAuth } from '@/middleware/auth';
 import { z } from 'zod';
 
@@ -30,34 +32,49 @@ async function createAlert(medicineId: string, medicine: any) {
 
   // Check for expired medicines
   if (medicine.expiryDate < now) {
-    await StockAlert.create({
+    const a = await StockAlert.create({
       tenantId: medicine.tenantId,
       medicineId,
       medicineName: medicine.name,
       alertType: 'expired',
       message: `${medicine.name} has expired (Expiry: ${medicine.expiryDate.toDateString()})`,
     });
+    try {
+      publishAlertEvent(String(a.tenantId), mapStockAlertToPayload(a as any));
+    } catch {
+      // ignore
+    }
   }
   // Check for medicines expiring soon
   else if (medicine.expiryDate < thirtyDaysLater) {
-    await StockAlert.create({
+    const a = await StockAlert.create({
       tenantId: medicine.tenantId,
       medicineId,
       medicineName: medicine.name,
       alertType: 'expiry_soon',
       message: `${medicine.name} will expire soon (Expiry: ${medicine.expiryDate.toDateString()})`,
     });
+    try {
+      publishAlertEvent(String(a.tenantId), mapStockAlertToPayload(a as any));
+    } catch {
+      // ignore
+    }
   }
 
   // Check for low stock
   if (medicine.quantity < medicine.minimumStock) {
-    await StockAlert.create({
+    const a = await StockAlert.create({
       tenantId: medicine.tenantId,
       medicineId,
       medicineName: medicine.name,
       alertType: 'low_stock',
       message: `${medicine.name} stock is low (Current: ${medicine.quantity}, Minimum: ${medicine.minimumStock})`,
     });
+    try {
+      publishAlertEvent(String(a.tenantId), mapStockAlertToPayload(a as any));
+    } catch {
+      // ignore
+    }
   }
 }
 

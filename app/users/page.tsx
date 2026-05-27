@@ -12,6 +12,7 @@ interface User {
 }
 
 const roleLabels: Record<string, string> = {
+  super_admin: 'Super Admin',
   owner: 'Owner',
   admin: 'Admin',
   receptionist: 'Receptionist',
@@ -22,7 +23,7 @@ const roleLabels: Record<string, string> = {
   staff: 'Staff',
 };
 
-const creatableRoles = clinicRoles.filter((role) => role !== 'staff');
+const creatableRoles = clinicRoles.filter((role) => role !== 'staff' && role !== 'super_admin');
 
 export default function UsersPage() {
   const router = useRouter();
@@ -58,7 +59,7 @@ export default function UsersPage() {
 
       const currentRole = normalizeDashboardRole(parsedUser.role);
 
-      if (currentRole !== 'admin' && currentRole !== 'owner') {
+      if (currentRole !== 'admin' && currentRole !== 'owner' && currentRole !== 'super_admin') {
         router.push('/dashboard');
         return;
       }
@@ -195,8 +196,8 @@ export default function UsersPage() {
     return <div className="rounded-xl border border-slate-200 bg-white p-8 text-center text-slate-600">Loading user settings...</div>;
   }
 
-  if (!user || (normalizeDashboardRole(user.role) !== 'admin' && normalizeDashboardRole(user.role) !== 'owner')) {
-    return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-red-700">Access denied. Owner or admin only.</div>;
+  if (!user || (normalizeDashboardRole(user.role) !== 'admin' && normalizeDashboardRole(user.role) !== 'owner' && normalizeDashboardRole(user.role) !== 'super_admin')) {
+    return <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-center text-red-700">Access denied. Owner, admin, or super admin only.</div>;
   }
 
   return (

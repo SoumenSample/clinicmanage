@@ -34,11 +34,15 @@ export async function GET(request: NextRequest) {
   return withAuth(async (req: NextRequest) => {
     try {
       await connectDB();
+      const auth = (req as any).user;
 
       const startDate = req.nextUrl.searchParams.get('startDate');
       const endDate = req.nextUrl.searchParams.get('endDate');
 
       let query: any = {};
+      if (auth?.tenantId) {
+        query.tenantId = auth.tenantId;
+      }
       if (startDate && endDate) {
         query.saleDate = {
           $gte: new Date(startDate),

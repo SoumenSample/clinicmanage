@@ -113,12 +113,15 @@ export default function AppointmentsPage() {
 
   const endOfLocalDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate(), 23, 59, 59, 999);
 
+  const isPastDate = (date: Date) => startOfLocalDay(date).getTime() < startOfLocalDay(new Date()).getTime();
+
   const diffInDays = (left: Date, right: Date) => {
     const dayMs = 24 * 60 * 60 * 1000;
     return Math.floor((startOfLocalDay(right).getTime() - startOfLocalDay(left).getTime()) / dayMs);
   };
 
   const isDoctorAvailableOnDate = (availability: AvailabilityItem, date: Date) => {
+    if (isPastDate(date)) return false;
     const start = new Date(availability.start);
     const end = new Date(availability.end);
     const recurrence = availability.recurrence || { type: 'none' };
@@ -180,6 +183,7 @@ export default function AppointmentsPage() {
   const availableDateKeys = new Set(
     visibleCalendarDays
       .filter((day): day is Date => Boolean(day))
+      .filter((day) => !isPastDate(day))
       .filter((day) => selectedDoctorAvailability.some((availability) => isDoctorAvailableOnDate(availability, day)))
       .map((day) => formatLocalDateKey(day))
   );
@@ -195,8 +199,10 @@ export default function AppointmentsPage() {
   };
 
   const getAvailableSlotsForDate = (date: Date) => {
+    if (isPastDate(date)) return [];
     const matchingAvailabilities = selectedDoctorAvailability.filter((availability) => isDoctorAvailableOnDate(availability, date));
     const slotMap = new Map<string, Date>();
+    const now = new Date();
 
     // duration for generated slots (appointment length)
     const durationMinutes = getEffectiveBookingDuration();
@@ -231,6 +237,7 @@ export default function AppointmentsPage() {
 
     // Filter out slots that overlap with existing scheduled appointments for the selected doctor
     const allSlots = Array.from(slotMap.values()).sort((left, right) => left.getTime() - right.getTime());
+    const slotsAfterNow = allSlots.filter((slot) => startOfLocalDay(slot).getTime() > startOfLocalDay(now).getTime() || slot.getTime() >= now.getTime());
 
     // Determine selected doctor identifiers
     const selectedDoctor = formData.doctorId || '';
@@ -257,7 +264,7 @@ export default function AppointmentsPage() {
       return true;
     };
 
-    return allSlots.filter((s) => isSlotFree(s));
+    return slotsAfterNow.filter((s) => isSlotFree(s));
   };
 
   const selectedDateKey = formData.dateTime ? formData.dateTime.slice(0, 10) : '';
@@ -415,6 +422,12 @@ export default function AppointmentsPage() {
       const appointmentDate = new Date(y, m, d, h, min, 0, 0);
       if (Number.isNaN(appointmentDate.getTime())) {
         setError('Invalid date and time');
+        setIsBooking(false);
+        return;
+      }
+
+      if (appointmentDate.getTime() < new Date().getTime()) {
+        setError('Cannot book an appointment in the past.');
         setIsBooking(false);
         return;
       }

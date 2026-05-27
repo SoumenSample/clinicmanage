@@ -273,7 +273,7 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[420px] items-center justify-center">
+      <div className="flex min-h-105 items-center justify-center">
         <div className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white px-6 py-4 shadow-sm">
           <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
           <p className="text-sm font-medium text-slate-700">Loading pharmacy settings...</p>
@@ -282,12 +282,12 @@ export default function SettingsPage() {
     );
   }
 
-  const isEditable = role === 'admin' || role === 'owner';
+  const isEditable = role === 'admin' || role === 'owner' || role === 'super_admin';
 
   return (
     <div className="space-y-8">
       <section className="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 p-6 shadow-sm md:p-8">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,_rgba(59,130,246,0.35),_transparent_35%),radial-gradient(circle_at_bottom_left,_rgba(16,185,129,0.2),_transparent_30%)]" />
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(59,130,246,0.35),transparent_35%),radial-gradient(circle_at_bottom_left,rgba(16,185,129,0.2),transparent_30%)]" />
         <div className="relative flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div className="max-w-2xl">
             
@@ -299,7 +299,7 @@ export default function SettingsPage() {
 
           <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-slate-200 backdrop-blur">
             <p className="font-medium text-white">Editable by</p>
-            <p className="mt-1 text-slate-300">{isEditable ? 'Admin / Owner' : 'View only for staff'}</p>
+            <p className="mt-1 text-slate-300">{isEditable ? 'Admin / Owner / Super Admin' : 'View only for staff'}</p>
           </div>
         </div>
       </section>
